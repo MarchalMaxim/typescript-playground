@@ -1,0 +1,22 @@
+{
+  "name": "typescript-playground",
+  "version": "1.0.0",
+  "description": "Playground for testing out typescript stuff",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/bundle.js --platform=browser --target=es2020",
+    "dev": "npm run build && live-server --port=8080 --open=/index.html",
+    "watch": "esbuild src/index.ts --bundle --outfile=dist/bundle.js --platform=browser --target=es2020 --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "esbuild": "^0.27.0",
+    "live-server": "^1.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
