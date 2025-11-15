@@ -1,13 +1,3 @@
-// Monaco Editor configuration
-require.config({ 
-    paths: { 
-        'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' 
-    } 
-});
-
-let editor;
-let ts;
-
 // Default TypeScript code
 const defaultCode = `// Welcome to TypeScript Playground!
 // Write your TypeScript code here and click "Run Code" to see the output
@@ -38,47 +28,13 @@ console.log("Doubled numbers:", doubled);
 // const invalid: string = 123; // This will show an error!
 `;
 
-// Initialize Monaco Editor
-require(['vs/editor/editor.main'], function() {
-    // Configure TypeScript compiler options
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-        target: monaco.languages.typescript.ScriptTarget.ES2020,
-        module: monaco.languages.typescript.ModuleKind.ESNext,
-        lib: ['ES2020', 'DOM'],
-        allowNonTsExtensions: true,
-        strict: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs
-    });
-
-    // Create the editor
-    editor = monaco.editor.create(document.getElementById('editor'), {
-        value: defaultCode,
-        language: 'typescript',
-        theme: 'vs-dark',
-        fontSize: 14,
-        minimap: { enabled: true },
-        automaticLayout: true,
-        scrollBeyondLastLine: false,
-        wordWrap: 'on',
-        lineNumbers: 'on',
-        folding: true,
-        renderWhitespace: 'selection'
-    });
-
-    // Store reference to TypeScript
-    ts = monaco.languages.typescript;
-});
+// Initialize editor
+const editor = document.getElementById('editor');
+editor.value = defaultCode;
 
 // Run button click handler
-document.getElementById('runBtn').addEventListener('click', async () => {
-    if (!editor) {
-        addOutput('Editor not initialized yet. Please wait...', 'error');
-        return;
-    }
-
-    const code = editor.getValue();
+document.getElementById('runBtn').addEventListener('click', () => {
+    const code = editor.value;
     const outputDiv = document.getElementById('output');
     const compiledDiv = document.getElementById('compiled');
     
@@ -87,73 +43,74 @@ document.getElementById('runBtn').addEventListener('click', async () => {
     compiledDiv.innerHTML = '';
 
     try {
-        // Get TypeScript worker to compile the code
-        const model = editor.getModel();
-        const worker = await monaco.languages.typescript.getTypeScriptWorker();
-        const client = await worker(model.uri);
-        
-        // Get compiled JavaScript output
-        const result = await client.getEmitOutput(model.uri.toString());
-        
-        if (result.outputFiles && result.outputFiles.length > 0) {
-            const jsCode = result.outputFiles[0].text;
-            
-            // Display compiled JavaScript
-            compiledDiv.textContent = jsCode;
-            
-            // Capture console output
-            const originalConsole = {
-                log: console.log,
-                error: console.error,
-                warn: console.warn,
-                info: console.info
-            };
-
-            // Override console methods
-            console.log = (...args) => {
-                addOutput(args.map(arg => formatValue(arg)).join(' '), 'log');
-                originalConsole.log(...args);
-            };
-
-            console.error = (...args) => {
-                addOutput(args.map(arg => formatValue(arg)).join(' '), 'error');
-                originalConsole.error(...args);
-            };
-
-            console.warn = (...args) => {
-                addOutput(args.map(arg => formatValue(arg)).join(' '), 'warn');
-                originalConsole.warn(...args);
-            };
-
-            console.info = (...args) => {
-                addOutput(args.map(arg => formatValue(arg)).join(' '), 'info');
-                originalConsole.info(...args);
-            };
-
-            try {
-                // Execute the compiled JavaScript
-                eval(jsCode);
-                
-                // Restore console
-                Object.assign(console, originalConsole);
-            } catch (execError) {
-                // Restore console
-                Object.assign(console, originalConsole);
-                addOutput(`Runtime Error: ${execError.message}`, 'error');
+        // Compile TypeScript to JavaScript
+        const result = ts.transpileModule(code, {
+            compilerOptions: {
+                target: ts.ScriptTarget.ES2020,
+                module: ts.ModuleKind.ESNext,
+                lib: ['ES2020', 'DOM'],
+                strict: true,
+                esModuleInterop: true
             }
-        } else {
-            // Check for compilation errors
-            const markers = await monaco.editor.getModelMarkers({ resource: model.uri });
-            if (markers.length > 0) {
-                markers.forEach(marker => {
-                    addOutput(
-                        `Line ${marker.startLineNumber}: ${marker.message}`,
-                        'error'
-                    );
-                });
-            } else {
-                addOutput('No output generated', 'info');
+        });
+
+        const jsCode = result.outputText;
+        
+        // Display compiled JavaScript
+        compiledDiv.textContent = jsCode;
+
+        // Capture console output
+        const originalConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn,
+            info: console.info
+        };
+
+        // Override console methods
+        console.log = (...args) => {
+            addOutput(args.map(arg => formatValue(arg)).join(' '), 'log');
+            originalConsole.log(...args);
+        };
+
+        console.error = (...args) => {
+            addOutput(args.map(arg => formatValue(arg)).join(' '), 'error');
+            originalConsole.error(...args);
+        };
+
+        console.warn = (...args) => {
+            addOutput(args.map(arg => formatValue(arg)).join(' '), 'warn');
+            originalConsole.warn(...args);
+        };
+
+        console.info = (...args) => {
+            addOutput(args.map(arg => formatValue(arg)).join(' '), 'info');
+            originalConsole.info(...args);
+        };
+
+        try {
+            // Execute the compiled JavaScript
+            eval(jsCode);
+            
+            // Restore console
+            Object.assign(console, originalConsole);
+            
+            // Show success message if no output
+            if (outputDiv.innerHTML === '') {
+                addOutput('✓ Code executed successfully (no console output)', 'info');
             }
+        } catch (execError) {
+            // Restore console
+            Object.assign(console, originalConsole);
+            addOutput(`Runtime Error: ${execError.message}`, 'error');
+        }
+
+        // Check for diagnostics
+        if (result.diagnostics && result.diagnostics.length > 0) {
+            result.diagnostics.forEach(diagnostic => {
+                const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+                addOutput(`TypeScript Error: ${message}`, 'error');
+            });
         }
     } catch (error) {
         addOutput(`Compilation Error: ${error.message}`, 'error');
@@ -192,5 +149,19 @@ document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         document.getElementById('runBtn').click();
+    }
+});
+
+// Handle tab key in textarea
+editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const value = editor.value;
+        
+        // Insert 4 spaces
+        editor.value = value.substring(0, start) + '    ' + value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 4;
     }
 });

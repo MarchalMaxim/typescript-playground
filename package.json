@@ -13,5 +13,8 @@
   "devDependencies": {
     "http-server": "^14.1.1",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "browserify": "^17.0.1"
   }
 }
