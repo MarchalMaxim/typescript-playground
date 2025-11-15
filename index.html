@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript Playground</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TypeScript Playground</h1>
+            <p class="subtitle">Write and test TypeScript code in your browser</p>
+        </header>
+        
+        <div class="playground">
+            <div class="editor-panel">
+                <div class="panel-header">
+                    <h2>TypeScript Code</h2>
+                    <button id="runBtn" class="run-button">▶ Run Code</button>
+                </div>
+                <div class="editor-container">
+                    <div id="editor"></div>
+                </div>
+            </div>
+            
+            <div class="output-panel">
+                <div class="panel-header">
+                    <h2>Output</h2>
+                    <button id="clearBtn" class="clear-button">Clear</button>
+                </div>
+                <div id="output" class="output-container"></div>
+                
+                <div class="panel-header">
+                    <h2>Compiled JavaScript</h2>
+                </div>
+                <div id="compiled" class="compiled-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
