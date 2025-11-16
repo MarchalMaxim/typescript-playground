@@ -3,124 +3,141 @@ import { BaseTransformer } from './base-transformer';
 
 /**
  * Transformer for fixing unsafe optional property access
- * Converts unsafe property access on optional properties to optional chaining
- * Also removes unnecessary undefined assignments from object literals
+ * Uses TypeScript's type checker to identify properties that can be null/undefined
+ * and converts their access to optional chaining
  */
 export class SafeOptionalAccessTransformer extends BaseTransformer {
     transform(sourceCode: string): string {
-        const sourceFile = this.createSourceFile(sourceCode);
-        
+        // Create a program with type checking enabled
+        const compilerOptions: ts.CompilerOptions = {
+            target: ts.ScriptTarget.Latest,
+            module: ts.ModuleKind.ESNext,
+            strict: true,
+            strictNullChecks: true, // Enable strict null checks to detect optional types
+            lib: ['lib.es2015.d.ts'],
+        };
+
+        const sourceFile = ts.createSourceFile(
+            'temp.ts',
+            sourceCode,
+            ts.ScriptTarget.Latest,
+            true
+        );
+
+        // Create a minimal compiler host
+        const host: ts.CompilerHost = {
+            getSourceFile: (fileName) => {
+                if (fileName === 'temp.ts') {
+                    return sourceFile;
+                }
+                // Return undefined for lib files - type checker will use built-in types
+                return undefined;
+            },
+            writeFile: () => {},
+            getCurrentDirectory: () => '',
+            getDirectories: () => [],
+            fileExists: (fileName) => fileName === 'temp.ts',
+            readFile: (fileName) => fileName === 'temp.ts' ? sourceCode : undefined,
+            getCanonicalFileName: (fileName) => fileName,
+            useCaseSensitiveFileNames: () => true,
+            getNewLine: () => '\n',
+            getDefaultLibFileName: (options) => ts.getDefaultLibFileName(options),
+        };
+
+        const program = ts.createProgram(['temp.ts'], compilerOptions, host);
+        const typeChecker = program.getTypeChecker();
+
         const transformerFactory = <T extends ts.Node>(context: ts.TransformationContext) => {
             return (rootNode: T) => {
                 const visit = (node: ts.Node): ts.Node => {
-                    // Handle element access on optional properties: a.c[0] -> a.c?.[0]
-                    if (ts.isElementAccessExpression(node)) {
-                        const expr = node.expression;
-                        
-                        // Check if accessing element on a property
-                        if (ts.isPropertyAccessExpression(expr)) {
-                            // Create optional chaining for element access
-                            const newNode = ts.factory.createElementAccessChain(
-                                expr,
-                                ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
-                                node.argumentExpression
-                            );
-                            return ts.visitEachChild(newNode, visit, context);
-                        }
-                    }
-                    
-                    // Convert call expressions on property access chains
-                    // Look for: obj.prop.method() -> obj.prop?.method()
+                    // Handle call expressions FIRST: obj.method()
                     if (ts.isCallExpression(node)) {
                         const expr = node.expression;
 
                         if (ts.isPropertyAccessExpression(expr)) {
                             const innerExpr = expr.expression;
-
-                            // Check if we're calling a method on a property access
-                            // Pattern: stuff.b.sort() -> stuff.b?.sort()
-                            if (ts.isPropertyAccessExpression(innerExpr)) {
-                                // Create optional chaining on the call expression itself
-                                // so that we get: innerExpr?.method(args)
-                                const optionalCallee = ts.factory.createPropertyAccessChain(
-                                    innerExpr,
+                            
+                            // Check if the method itself (expr) is nullable (optional function)
+                            if (isNullableType(expr, typeChecker)) {
+                                // The function property is optional, use optional call
+                                const newNode = ts.factory.createCallChain(
+                                    expr, // Don't visit expr, handle it as-is
+                                    ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
+                                    node.typeArguments,
+                                    node.arguments.map(arg => ts.visitNode(arg, visit) as ts.Expression)
+                                );
+                                return newNode;
+                            }
+                            
+                            // Check if the property being accessed (not called) is nullable
+                            // e.g., user.ages.map() where ages is optional
+                            if (isNullableType(innerExpr, typeChecker)) {
+                                // The object being accessed is nullable
+                                // We need to create data.items?.forEach(...) as a complete call chain
+                                const visitedInnerExpr = ts.visitNode(innerExpr, visit) as ts.Expression;
+                                
+                                // Build the complete chain: data.items?.forEach(...)
+                                // First create the property access chain for data.items?.forEach
+                                const propertyChain = ts.factory.createPropertyAccessChain(
+                                    visitedInnerExpr,
                                     ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
                                     expr.name
                                 );
-
+                                
+                                // Then create a call chain from that property chain
                                 const newNode = ts.factory.createCallChain(
-                                    optionalCallee,
-                                    undefined, // questionDotToken is already on the callee chain
+                                    propertyChain,
+                                    undefined, // No question dot token here - it's already in the property chain
                                     node.typeArguments,
-                                    node.arguments
+                                    node.arguments.map(arg => ts.visitNode(arg, visit) as ts.Expression)
                                 );
-
-                                return ts.visitEachChild(newNode, visit, context);
-                            }
-                            
-                            // Handle direct function calls on properties: config.validate() -> config.validate?.()
-                            // Only if the property is being called directly (not nested)
-                            if (ts.isIdentifier(innerExpr)) {
-                                // Create optional call chain without adding optional to the identifier
-                                const newNode = ts.factory.createCallChain(
-                                    expr,
-                                    ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
-                                    node.typeArguments,
-                                    node.arguments
-                                );
-
-                                return ts.visitEachChild(newNode, visit, context);
+                                return newNode;
                             }
                         }
+                        
+                        // Visit children normally if we didn't transform
+                        return ts.visitEachChild(node, visit, context);
                     }
-                    
-                    // Handle deep nested property access chains (3+ levels): user.profile.settings.theme -> user.profile?.settings?.theme
-                    // Only transform if we're not inside a call/element expression (those are handled above)
+
+                    // Handle property access expressions: obj.prop
                     if (ts.isPropertyAccessExpression(node)) {
+                        // Check if this is part of a call expression - if so, let the call expression handler deal with it
+                        const parent = node.parent;
+                        if (parent && ts.isCallExpression(parent) && parent.expression === node) {
+                            // This property access is the callee of a call expression, don't transform it here
+                            return ts.visitEachChild(node, visit, context);
+                        }
+                        
                         const expr = node.expression;
                         
-                        // Check if this is a deep nested access (at least 3 levels: a.b.c)
-                        // We do this by checking if expr is also a property access with another property access inside
-                        if (ts.isPropertyAccessExpression(expr) && ts.isPropertyAccessExpression(expr.expression)) {
-                            // We have a 3+ level chain. Transform ALL intermediate levels to use optional chaining.
-                            // For user.profile.settings.theme, we want: user.profile?.settings?.theme
-                            
-                            // Transform the inner part recursively, but we need special handling
-                            const transformedExpr = transformNestedAccess(expr);
-                            
-                            // Create optional chaining for this property access with the transformed expression
+                        // Check if the expression type includes undefined or null
+                        if (isNullableType(expr, typeChecker)) {
+                            // Convert to optional chaining
                             const newNode = ts.factory.createPropertyAccessChain(
-                                transformedExpr,
+                                ts.visitNode(expr, visit) as ts.Expression,
                                 ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
                                 node.name
                             );
-                            
-                            // Return without visiting children again since we already transformed expr
                             return newNode;
                         }
                     }
-                    
-                    // Helper function to recursively transform nested property access
-                    function transformNestedAccess(node: ts.PropertyAccessExpression): ts.Expression {
+
+                    // Handle element access: obj[0] or obj['key']
+                    if (ts.isElementAccessExpression(node)) {
                         const expr = node.expression;
                         
-                        if (ts.isPropertyAccessExpression(expr)) {
-                            // Recursively transform the deeper levels
-                            const transformedExpr = transformNestedAccess(expr);
-                            
-                            // Add optional chaining at this level
-                            return ts.factory.createPropertyAccessChain(
-                                transformedExpr,
+                        // Check if the expression type includes undefined or null
+                        if (isNullableType(expr, typeChecker)) {
+                            // Convert to optional element access
+                            const newNode = ts.factory.createElementAccessChain(
+                                ts.visitNode(expr, visit) as ts.Expression,
                                 ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
-                                node.name
+                                ts.visitNode(node.argumentExpression, visit) as ts.Expression
                             );
+                            return newNode;
                         }
-                        
-                        // Base case: expr is not a property access (e.g., it's an identifier)
-                        // Just return the current node as-is
-                        return node;
                     }
-                    
+
                     // Remove unnecessary undefined assignments in object literals
                     if (ts.isObjectLiteralExpression(node)) {
                         const newProperties = node.properties.filter(prop => {
@@ -137,9 +154,9 @@ export class SafeOptionalAccessTransformer extends BaseTransformer {
                         if (newProperties.length !== node.properties.length) {
                             const newNode = ts.factory.updateObjectLiteralExpression(
                                 node,
-                                newProperties
+                                newProperties.map(prop => ts.visitNode(prop, visit) as ts.ObjectLiteralElementLike)
                             );
-                            return ts.visitEachChild(newNode, visit, context);
+                            return newNode;
                         }
                     }
 
@@ -150,6 +167,39 @@ export class SafeOptionalAccessTransformer extends BaseTransformer {
             };
         };
 
-        return this.applyTransformer(sourceFile, transformerFactory);
+        const result = ts.transform(sourceFile, [transformerFactory]);
+        const printer = ts.createPrinter();
+        return printer.printFile(result.transformed[0] as ts.SourceFile);
+    }
+}
+
+/**
+ * Check if a type includes null or undefined
+ */
+function isNullableType(node: ts.Node, typeChecker: ts.TypeChecker): boolean {
+    try {
+        const type = typeChecker.getTypeAtLocation(node);
+        if (!type) {
+            return false;
+        }
+
+        // Helper to check if a single type is nullable
+        const isTypeNullable = (t: ts.Type): boolean => {
+            return (t.flags & ts.TypeFlags.Undefined) !== 0 || 
+                   (t.flags & ts.TypeFlags.Null) !== 0 ||
+                   (t.flags & ts.TypeFlags.Void) !== 0;
+        };
+
+        // Check if type is a union type
+        if (type.isUnion()) {
+            // Check if any of the union types is undefined or null
+            return type.types.some(t => isTypeNullable(t));
+        }
+
+        // Check if the type itself is undefined or null
+        return isTypeNullable(type);
+    } catch (e) {
+        // If we can't get the type, be conservative and don't transform
+        return false;
     }
 }
