@@ -45,6 +45,16 @@ npm run dev
 
 This will open the playground in your browser at `http://localhost:8080`.
 
+### Running Tests
+
+The project includes comprehensive test coverage for all transformers using Jest:
+
+```bash
+npm test                    # Run all tests
+npm run test:watch         # Run tests in watch mode
+npm run test:coverage      # Run tests with coverage report
+```
+
 ## Usage
 
 1. **Enter TypeScript Code**: Type or paste your TypeScript code in the left panel
@@ -63,31 +73,51 @@ This will open the playground in your browser at `http://localhost:8080`.
 - `npm run build` - Build the project for production
 - `npm run dev` - Build and start the development server
 - `npm run watch` - Watch for changes and rebuild automatically
+- `npm test` - Run all tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
 
 ### Project Structure
 
 ```
 typescript-playground/
 ├── src/
-│   ├── ast-analyzer.ts    # AST transformation logic
-│   └── index.ts           # Main application entry point
-├── dist/                  # Build output (generated)
-├── index.html            # Main HTML page
-├── styles.css            # Styling
-├── tsconfig.json         # TypeScript configuration
-└── package.json          # Project dependencies
+│   ├── transformers/              # Modular transformer implementations
+│   │   ├── base-transformer.ts    # Base transformer interface
+│   │   ├── strict-return-type-transformer.ts
+│   │   ├── explicit-any-transformer.ts
+│   │   ├── readonly-transformer.ts
+│   │   ├── safe-optional-access-transformer.ts
+│   │   ├── index.ts               # Transformer exports
+│   │   ├── README.md              # Transformer documentation
+│   │   └── __tests__/             # Test files
+│   ├── ast-analyzer.ts            # AST analysis orchestrator
+│   └── index.ts                   # Main application entry point
+├── dist/                          # Build output (generated)
+├── index.html                     # Main HTML page
+├── styles.css                     # Styling
+├── jest.config.js                 # Jest test configuration
+├── tsconfig.json                  # TypeScript configuration
+└── package.json                   # Project dependencies
 ```
 
 ## AST Transformations
 
-This playground uses the TypeScript Compiler API to traverse and transform code. Here's how the transformations work:
+This playground uses the TypeScript Compiler API to traverse and transform code. Each transformer is implemented as a modular, testable class in its own file.
 
-### AST Visitor Pattern
+### Modular Architecture
 
-The `ASTVisitor` class provides utilities for traversing the AST:
-- Visit all nodes in the tree
-- Convert AST to JSON for visualization
-- Apply custom transformations
+All transformers extend the `BaseTransformer` class which provides common utilities:
+- `createSourceFile()` - Parse source code into AST
+- `applyTransformer()` - Apply transformation and print results
+
+This makes transformers:
+- **Testable**: Each transformer can be tested in isolation
+- **Reusable**: Easy to use transformers programmatically
+- **Maintainable**: Clear separation of concerns
+- **Extensible**: Simple to add new transformers
+
+See `src/transformers/README.md` for details on creating new transformers.
 
 ### Example Transformations
 
