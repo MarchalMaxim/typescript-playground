@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript AST Playground</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TypeScript AST Playground</h1>
+            <p class="subtitle">Investigate TypeScript AST Transformations</p>
+        </header>
+
+        <div class="playground-layout">
+            <div class="panel input-panel">
+                <h2>Input TypeScript Code</h2>
+                <textarea id="input-code" class="code-editor" placeholder="Enter your TypeScript code here...">// Example TypeScript code
+interface User {
+  name: string;
+  age: number;
+}
+
+function greetUser(user: User) {
+  console.log('Hello, ' + user.name);
+  return user.age > 18;
+}</textarea>
+            </div>
+
+            <div class="panel output-panel">
+                <h2>Transformed Code</h2>
+                <pre id="output-code" class="code-display"></pre>
+            </div>
+
+            <div class="panel ast-panel">
+                <h2>AST Structure</h2>
+                <pre id="ast-output" class="code-display"></pre>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="transform-btn" class="btn btn-primary">Analyze & Transform</button>
+            <button id="clear-btn" class="btn btn-secondary">Clear</button>
+            <select id="transform-type" class="transform-select">
+                <option value="show-ast">Show AST</option>
+                <option value="add-strict-types">Add Strict Return Types</option>
+                <option value="explicit-any">Make 'any' Types Explicit</option>
+                <option value="const-to-readonly">Convert to Readonly</option>
+                <option value="safe-optional-access">Fix Unsafe Optional Access</option>
+            </select>
+        </div>
+
+        <div class="info-panel">
+            <h3>About This Playground</h3>
+            <p>This playground allows you to:</p>
+            <ul>
+                <li>View the Abstract Syntax Tree (AST) of TypeScript code</li>
+                <li>Apply various AST transformations to make code more strict</li>
+                <li>Experiment with TypeScript Compiler API</li>
+                <li>Learn about code analysis and transformation patterns</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="dist/bundle.js"></script>
+</body>
+</html>
