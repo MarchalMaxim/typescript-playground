@@ -151,4 +151,23 @@ const val = nested.values[0][1];`;
         // The second [1] access is safe if the first access returns a value
         expect(result).toContain('nested.values?.[0]');
     });
+
+    it('should handle nested optional property access chains', () => {
+        const input = `
+interface User {
+    profile?: {
+        settings?: {
+            theme: string;
+        }
+    }
+}
+
+const user: User = {};
+const theme = user.profile.settings.theme;`;
+
+        const result = transformer.transform(input);
+        
+        // After transformation, both profile and settings should have optional chaining
+        expect(result).toContain('user.profile?.settings?.theme');
+    });
 });

@@ -74,6 +74,53 @@ export class SafeOptionalAccessTransformer extends BaseTransformer {
                         }
                     }
                     
+                    // Handle deep nested property access chains (3+ levels): user.profile.settings.theme -> user.profile?.settings?.theme
+                    // Only transform if we're not inside a call/element expression (those are handled above)
+                    if (ts.isPropertyAccessExpression(node)) {
+                        const expr = node.expression;
+                        
+                        // Check if this is a deep nested access (at least 3 levels: a.b.c)
+                        // We do this by checking if expr is also a property access with another property access inside
+                        if (ts.isPropertyAccessExpression(expr) && ts.isPropertyAccessExpression(expr.expression)) {
+                            // We have a 3+ level chain. Transform ALL intermediate levels to use optional chaining.
+                            // For user.profile.settings.theme, we want: user.profile?.settings?.theme
+                            
+                            // Transform the inner part recursively, but we need special handling
+                            const transformedExpr = transformNestedAccess(expr);
+                            
+                            // Create optional chaining for this property access with the transformed expression
+                            const newNode = ts.factory.createPropertyAccessChain(
+                                transformedExpr,
+                                ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
+                                node.name
+                            );
+                            
+                            // Return without visiting children again since we already transformed expr
+                            return newNode;
+                        }
+                    }
+                    
+                    // Helper function to recursively transform nested property access
+                    function transformNestedAccess(node: ts.PropertyAccessExpression): ts.Expression {
+                        const expr = node.expression;
+                        
+                        if (ts.isPropertyAccessExpression(expr)) {
+                            // Recursively transform the deeper levels
+                            const transformedExpr = transformNestedAccess(expr);
+                            
+                            // Add optional chaining at this level
+                            return ts.factory.createPropertyAccessChain(
+                                transformedExpr,
+                                ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
+                                node.name
+                            );
+                        }
+                        
+                        // Base case: expr is not a property access (e.g., it's an identifier)
+                        // Just return the current node as-is
+                        return node;
+                    }
+                    
                     // Remove unnecessary undefined assignments in object literals
                     if (ts.isObjectLiteralExpression(node)) {
                         const newProperties = node.properties.filter(prop => {
