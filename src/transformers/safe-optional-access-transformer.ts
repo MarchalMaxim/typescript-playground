@@ -72,18 +72,22 @@ export class SafeOptionalAccessTransformer extends BaseTransformer {
                             // Check if the property being accessed (not called) is nullable
                             // e.g., user.ages.map() where ages is optional
                             if (isNullableType(innerExpr, typeChecker)) {
-                                // The object being accessed is nullable, make the whole call chain optional
+                                // The object being accessed is nullable
+                                // We need to create data.items?.forEach(...) as a complete call chain
                                 const visitedInnerExpr = ts.visitNode(innerExpr, visit) as ts.Expression;
-                                const optionalAccess = ts.factory.createPropertyAccessChain(
+                                
+                                // Build the complete chain: data.items?.forEach(...)
+                                // First create the property access chain for data.items?.forEach
+                                const propertyChain = ts.factory.createPropertyAccessChain(
                                     visitedInnerExpr,
                                     ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
                                     expr.name
                                 );
                                 
-                                // Create the call with the optional access (not optional call)
-                                const newNode = ts.factory.updateCallExpression(
-                                    node,
-                                    optionalAccess,
+                                // Then create a call chain from that property chain
+                                const newNode = ts.factory.createCallChain(
+                                    propertyChain,
+                                    undefined, // No question dot token here - it's already in the property chain
                                     node.typeArguments,
                                     node.arguments.map(arg => ts.visitNode(arg, visit) as ts.Expression)
                                 );
