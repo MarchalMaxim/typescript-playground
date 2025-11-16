@@ -34,30 +34,43 @@ let obj = {a: 10, b: undefined, c: 'test'};`;
         expect(result).not.toContain('b: undefined');
     });
 
-    it('should handle nested property access chains', () => {
+    it('should NOT add optional chaining when property is required', () => {
         const input = `
-obj.optional.method();
-obj.required.value;`;
+interface Data {
+    items: string[];
+}
+
+const data: Data = { items: [] };
+data.items.forEach(item => console.log(item));`;
 
         const result = transformer.transform(input);
         
-        expect(result).toContain('obj.optional?.method');
-        expect(result).toContain('obj.required.value');
+        // Should NOT add optional chaining because items is required
+        expect(result).toContain('data.items.forEach');
+        expect(result).not.toContain('data.items?.forEach');
+        // console.log should definitely not be optional
+        expect(result).not.toContain('console.log?.');
     });
 
-    it('should handle multiple optional accesses in same code', () => {
+    it('should add optional chaining when property is optional', () => {
         const input = `
-data.items.forEach();
-config.settings.apply();`;
+interface Data {
+    items?: string[];
+}
+
+const data: Data = {};
+data.items.forEach(item => console.log(item));`;
 
         const result = transformer.transform(input);
         
+        // Should add optional chaining because items is optional
         expect(result).toContain('data.items?.forEach');
-        expect(result).toContain('config.settings?.apply');
+        // console.log should NOT be optional because it's not nullable
+        expect(result).not.toContain('console.log?.');
     });
 
-        it('should use optional call for methods on optional arrays', () => {
-                const input = `// Example TypeScript code
+    it('should use optional call for methods on optional arrays', () => {
+        const input = `
 interface User {
     name: string;
     ages?: number[];
@@ -68,14 +81,21 @@ function greetUser(user: User) {
     return user.ages.map(a => a > 18);
 }`;
 
-                const result = transformer.transform(input);
+        const result = transformer.transform(input);
 
-                expect(result).toContain("return user.ages?.map(a => a > 18);");
-        });
+        // Should add optional chaining to ages property access
+        expect(result).toContain("user.ages?.map");
+        // Should NOT have console.log be optional
+        expect(result).not.toContain('console.log?.');
+    });
 
     it('should not modify already safe code', () => {
         const input = `
-let obj = {a: 10, b: 20};
+interface Obj {
+    a: number;
+    b: number;
+}
+let obj: Obj = {a: 10, b: 20};
 obj?.prop?.method();`;
 
         const result = transformer.transform(input);
@@ -169,5 +189,34 @@ const theme = user.profile.settings.theme;`;
         
         // After transformation, both profile and settings should have optional chaining
         expect(result).toContain('user.profile?.settings?.theme');
+    });
+
+    it('should handle properties that can be null', () => {
+        const input = `
+interface Data {
+    value: string | null;
+}
+
+const data: Data = { value: null };
+const upper = data.value.toUpperCase();`;
+
+        const result = transformer.transform(input);
+        
+        // Should add optional chaining to value property access
+        expect(result).toContain('data.value?.toUpperCase');
+    });
+
+    it('should NOT transform non-nullable standard library calls', () => {
+        const input = `
+const arr = [1, 2, 3];
+const result = arr.map(x => x * 2);
+console.log(result);`;
+
+        const result = transformer.transform(input);
+        
+        // Should not add optional chaining to standard array methods
+        expect(result).toContain('arr.map');
+        expect(result).not.toContain('arr.map?.');
+        expect(result).not.toContain('console.log?.');
     });
 });
