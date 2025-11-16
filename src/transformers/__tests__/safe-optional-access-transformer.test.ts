@@ -56,6 +56,23 @@ config.settings.apply();`;
         expect(result).toContain('config.settings?.apply');
     });
 
+        it('should use optional call for methods on optional arrays', () => {
+                const input = `// Example TypeScript code
+interface User {
+    name: string;
+    ages?: number[];
+}
+
+function greetUser(user: User) {
+    console.log('Hello, ' + user.name);
+    return user.ages.map(a => a > 18);
+}`;
+
+                const result = transformer.transform(input);
+
+                expect(result).toContain("return user.ages?.map(a => a > 18);");
+        });
+
     it('should not modify already safe code', () => {
         const input = `
 let obj = {a: 10, b: 20};

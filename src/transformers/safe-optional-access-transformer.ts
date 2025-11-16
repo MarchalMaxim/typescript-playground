@@ -17,27 +17,28 @@ export class SafeOptionalAccessTransformer extends BaseTransformer {
                     // Look for: obj.prop.method() -> obj.prop?.method()
                     if (ts.isCallExpression(node)) {
                         const expr = node.expression;
-                        
+
                         if (ts.isPropertyAccessExpression(expr)) {
                             const innerExpr = expr.expression;
-                            
+
                             // Check if we're calling a method on a property access
                             // Pattern: stuff.b.sort() -> stuff.b?.sort()
                             if (ts.isPropertyAccessExpression(innerExpr)) {
-                                // Create optional chaining on the method call itself
-                                const newExpression = ts.factory.createPropertyAccessChain(
+                                // Create optional chaining on the call expression itself
+                                // so that we get: innerExpr?.method(args)
+                                const optionalCallee = ts.factory.createPropertyAccessChain(
                                     innerExpr,
                                     ts.factory.createToken(ts.SyntaxKind.QuestionDotToken),
                                     expr.name
                                 );
-                                
-                                const newNode = ts.factory.updateCallExpression(
-                                    node,
-                                    newExpression,
+
+                                const newNode = ts.factory.createCallChain(
+                                    optionalCallee,
+                                    undefined, // questionDotToken is already on the callee chain
                                     node.typeArguments,
                                     node.arguments
                                 );
-                                
+
                                 return ts.visitEachChild(newNode, visit, context);
                             }
                         }
