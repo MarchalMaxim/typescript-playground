@@ -19,6 +19,74 @@ class PlaygroundApp {
     private clearBtn: HTMLButtonElement;
     private transformSelect: HTMLSelectElement;
 
+    // Example code snippets for each transformer
+    private readonly exampleCodeMap: Record<string, string> = {
+        'show-ast': `// Example TypeScript code
+interface User {
+  name: string;
+  age: number;
+}
+
+function greetUser(user: User) {
+  console.log('Hello, ' + user.name);
+  return user.age > 18;
+}`,
+        'add-strict-types': `// Functions without return types
+function greetUser(user: string) {
+    console.log('Hello, ' + user);
+    return true;
+}
+
+function calculateSum(a: number, b: number) {
+    return a + b;
+}`,
+        'explicit-any': `// Parameters without type annotations
+function process(data) {
+    return data.value;
+}
+
+function combine(a, b: number, c) {
+    return a + b + c;
+}
+
+const transform = (input) => {
+    return input.toUpperCase();
+};`,
+        'const-to-readonly': `// Interface properties without readonly
+interface User {
+    name: string;
+    age: number;
+    email?: string;
+}
+
+interface Config {
+    host: string;
+    port?: number;
+    timeout: number;
+}`,
+        'safe-optional-access': `// Unsafe optional property access
+interface Data {
+    items?: string[];
+    validate?: () => boolean;
+}
+
+const data: Data = {};
+data.items.forEach(item => console.log(item));
+data.validate();
+const first = data.items[0];
+
+interface User {
+    profile?: {
+        settings?: {
+            theme: string;
+        }
+    }
+}
+
+const user: User = {};
+const theme = user.profile.settings.theme;`
+    };
+
     constructor() {
         // Get DOM elements
         const inputContainer = document.getElementById('input-code') as HTMLTextAreaElement;
@@ -33,6 +101,19 @@ class PlaygroundApp {
         this.setupOutputEditor(outputContainer);
         this.setupEventListeners();
         this.showWelcomeMessage();
+        
+        // Load initial example code based on default selection
+        const initialTransformType = this.transformSelect.value;
+        const initialCode = this.exampleCodeMap[initialTransformType];
+        if (initialCode) {
+            this.editorView.dispatch({
+                changes: {
+                    from: 0,
+                    to: this.editorView.state.doc.length,
+                    insert: initialCode
+                }
+            });
+        }
     }
 
     private setupCodeMirror(container: HTMLTextAreaElement): void {
@@ -117,6 +198,33 @@ class PlaygroundApp {
     private setupEventListeners(): void {
         this.transformBtn.addEventListener('click', () => this.handleTransform());
         this.clearBtn.addEventListener('click', () => this.handleClear());
+        this.transformSelect.addEventListener('change', () => this.handleTransformTypeChange());
+    }
+
+    private handleTransformTypeChange(): void {
+        const transformType = this.transformSelect.value;
+        const exampleCode = this.exampleCodeMap[transformType];
+        
+        if (exampleCode) {
+            // Load the example code into the editor
+            this.editorView.dispatch({
+                changes: {
+                    from: 0,
+                    to: this.editorView.state.doc.length,
+                    insert: exampleCode
+                }
+            });
+            
+            // Clear the output panels
+            this.outputView.dispatch({
+                changes: {
+                    from: 0,
+                    to: this.outputView.state.doc.length,
+                    insert: 'Click "Analyze & Transform" to see the transformed code here.'
+                }
+            });
+            this.astOutputElement.textContent = 'The AST structure will appear here after analysis.';
+        }
     }
 
     private showWelcomeMessage(): void {
