@@ -2,6 +2,8 @@
 
 A playground for investigating TypeScript AST transformations and code rewritings. This project allows you to visualize the Abstract Syntax Tree (AST) of TypeScript code and apply various transformations to make your code more strict and better typed.
 
+🌐 **[Try it live on GitHub Pages](https://marchalmaxim.github.io/typescript-playground/)**
+
 ## Features
 
 - 🎯 **Interactive HTML/CSS/JS Interface** - Clean, modern web interface for code experimentation
@@ -100,6 +102,33 @@ typescript-playground/
 ├── tsconfig.json                  # TypeScript configuration
 └── package.json                   # Project dependencies
 ```
+
+## Deployment
+
+### GitHub Pages
+
+This project is configured to automatically deploy to GitHub Pages when changes are pushed to the `main` branch.
+
+#### Setup Instructions
+
+1. **Enable GitHub Pages** in your repository settings:
+   - Go to your repository on GitHub
+   - Navigate to **Settings** → **Pages**
+   - Under **Source**, select **GitHub Actions**
+
+2. **Push to main branch**: The deployment workflow will automatically trigger and build/deploy your site
+
+3. **Access your site**: Once deployed, your playground will be available at:
+   ```
+   https://[your-username].github.io/typescript-playground/
+   ```
+
+The deployment workflow (`.github/workflows/deploy.yml`) automatically:
+- Installs dependencies
+- Builds the project (`npm run build`)
+- Deploys the site to GitHub Pages
+
+No manual build steps are required - just push your changes and the workflow handles everything!
 
 ## AST Transformations
 
