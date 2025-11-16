@@ -107,4 +107,48 @@ let obj = {
         expect(result).not.toContain('d: undefined');
         expect(result).toContain('e: false');
     });
+
+    it('should handle function calls on optional properties (a.b() where b is optional)', () => {
+        const input = `
+interface Config {
+    validate?: () => boolean;
+}
+
+const config: Config = {};
+config.validate();`;
+
+        const result = transformer.transform(input);
+        
+        expect(result).toContain('config.validate?.()');
+    });
+
+    it('should handle array element access on optional properties (a.c[0] where c is optional)', () => {
+        const input = `
+interface Data {
+    items?: string[];
+}
+
+const data: Data = {};
+const first = data.items[0];`;
+
+        const result = transformer.transform(input);
+        
+        expect(result).toContain('data.items?.[0]');
+    });
+
+    it('should handle chained optional array access', () => {
+        const input = `
+interface Nested {
+    values?: number[][];
+}
+
+const nested: Nested = {};
+const val = nested.values[0][1];`;
+
+        const result = transformer.transform(input);
+        
+        // After transformation, the first access should be optional
+        // The second [1] access is safe if the first access returns a value
+        expect(result).toContain('nested.values?.[0]');
+    });
 });
